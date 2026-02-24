@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MKクイズ">
+<meta name="theme-color" content="#C8102E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>東京MK 地理知識チェック</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --red: #C8102E; --dark: #1a1a2e;
+  --gray: #f4f4f8; --text: #222; --sub: #666; --r: 16px;
+}
+body {
+  font-family: 'Hiragino Sans','Noto Sans JP',sans-serif;
+  background: var(--gray); color: var(--text);
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+}
+header {
+  width: 100%; background: var(--red); color: #fff;
+  padding: 14px 20px; display: flex; align-items: center;
+  justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.h-left { display: flex; flex-direction: column; }
+.logo { font-size: 1.2rem; font-weight: 900; letter-spacing: .05em; }
+.subtitle { font-size: .75rem; opacity: .85; }
+.level-badge {
+  background: rgba(255,255,255,.2); border-radius: 20px;
+  padding: 4px 14px; font-size: .85rem; font-weight: 900;
+  display: flex; align-items: center; gap: 6px;
+}
+.screen { width: 100%; max-width: 540px; padding: 20px 16px; flex: 1; }
+.card {
+  background: #fff; border-radius: var(--r);
+  padding: 24px 20px; box-shadow: 0 2px 16px rgba(0,0,0,.08); margin-bottom: 14px;
+}
+.badge {
+  display: inline-block; background: var(--red); color: #fff;
+  border-radius: 20px; padding: 3px 12px; font-size: .75rem;
+  font-weight: 700; margin-bottom: 10px;
+}
+.card h2 { font-size: 1.1rem; margin-bottom: 8px; }
+.card p { color: var(--sub); font-size: .88rem; line-height: 1.7; }
+.info-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.chip {
+  background: var(--gray); border-radius: 8px;
+  padding: 5px 10px; font-size: .8rem; color: var(--sub);
+}
+
+/* Level selector */
+.level-grid {
+  display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-top: 14px;
+}
+.lv-btn {
+  border: 2px solid #ddd; border-radius: 10px; padding: 10px 4px;
+  background: #fff; cursor: pointer; text-align: center;
+  font-size: .8rem; font-weight: 700; transition: all .15s;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.lv-btn .lv-num { font-size: 1.1rem; }
+.lv-btn.unlocked { border-color: #ddd; color: var(--text); }
+.lv-btn.current { border-color: var(--red); background: #fff5f5; color: var(--red); }
+.lv-btn.locked { border-color: #eee; color: #ccc; background: #fafafa; cursor: not-allowed; }
+.lv-btn .lv-star { font-size: .65rem; }
+
+.btn-primary {
+  display: block; width: 100%; background: var(--red); color: #fff;
+  border: none; border-radius: var(--r); padding: 15px;
+  font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 8px;
+  transition: opacity .2s, transform .1s; letter-spacing: .05em;
+}
+.btn-primary:active { opacity: .85; transform: scale(.98); }
+.btn-primary:disabled { background: #ccc; cursor: not-allowed; transform: none; opacity: 1; }
+
+/* Loading */
+#loadingScreen .card { text-align: center; padding: 40px 20px; }
+.spinner {
+  width: 48px; height: 48px; border: 5px solid #eee;
+  border-top-color: var(--red); border-radius: 50%;
+  animation: spin .8s linear infinite; margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-txt { font-size: .9rem; color: var(--sub); line-height: 1.7; }
+
+/* Quiz */
+.prog-wrap { margin-bottom: 14px; }
+.prog-label {
+  display: flex; justify-content: space-between;
+  font-size: .8rem; color: var(--sub); margin-bottom: 5px;
+}
+.prog-bar { height: 6px; background: #ddd; border-radius: 10px; overflow: hidden; }
+.prog-fill { height: 100%; background: var(--red); border-radius: 10px; transition: width .4s; }
+.q-type-badge {
+  display: inline-block; border-radius: 20px;
+  padding: 3px 10px; font-size: .73rem; font-weight: 700; margin-bottom: 8px;
+}
+.type-ox { background: #fff3e0; color: #e65100; }
+.type-choice { background: #e8f5e9; color: #2e7d32; }
+.q-text { font-size: 1rem; font-weight: 700; line-height: 1.6; margin-bottom: 18px; }
+.choices { display: flex; flex-direction: column; gap: 9px; }
+.choice-btn {
+  background: #fff; border: 2px solid #ddd; border-radius: 12px;
+  padding: 13px 14px; font-size: .92rem; cursor: pointer; text-align: left;
+  transition: border-color .15s; display: flex; align-items: center; gap: 10px;
+}
+.choice-btn:active { transform: scale(.98); }
+.choice-icon {
+  width: 26px; height: 26px; border-radius: 50%; background: #eee;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .82rem; font-weight: 700; flex-shrink: 0; color: #888;
+}
+.choice-btn.correct { border-color: #2e7d32; background: #e8f5e9 !important; }
+.choice-btn.correct .choice-icon { background: #2e7d32; color: #fff; }
+.choice-btn.wrong { border-color: #c62828; background: #ffebee !important; }
+.choice-btn.wrong .choice-icon { background: #c62828; color: #fff; }
+.choice-btn.reveal-correct { border-color: #2e7d32; background: #e8f5e9; }
+.choice-btn.reveal-correct .choice-icon { background: #2e7d32; color: #fff; }
+.ox-wrap { display: flex; gap: 14px; }
+.ox-btn {
+  flex: 1; border: 2px solid #ddd; border-radius: 14px; padding: 22px 10px;
+  font-size: 2rem; cursor: pointer; background: #fff;
+  transition: border-color .15s; display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.ox-btn .lbl { font-size: .75rem; font-weight: 700; color: var(--sub); }
+.ox-btn.correct { border-color: #2e7d32; background: #e8f5e9 !important; }
+.ox-btn.wrong { border-color: #c62828; background: #ffebee !important; }
+.ox-btn.reveal-correct { border-color: #2e7d32; background: #e8f5e9; }
+.explain-box {
+  margin-top: 14px; background: #fff; border-left: 4px solid var(--red);
+  border-radius: 0 12px 12px 0; padding: 12px 14px;
+  font-size: .86rem; line-height: 1.7; display: none;
+}
+.explain-box.show { display: block; }
+.res-label { font-weight: 900; font-size: .95rem; margin-bottom: 5px; }
+.res-label.ok { color: #2e7d32; }
+.res-label.ng { color: #c62828; }
+.btn-next {
+  display: none; width: 100%; background: var(--dark); color: #fff;
+  border: none; border-radius: var(--r); padding: 13px;
+  font-size: .95rem; font-weight: 700; cursor: pointer; margin-top: 10px;
+}
+.btn-next.show { display: block; }
+
+/* Result */
+.result-hero { text-align: center; padding: 20px 0 14px; }
+.score-circle {
+  width: 120px; height: 120px; border-radius: 50%; border: 8px solid var(--red);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin: 0 auto 14px; background: #fff;
+}
+.score-num { font-size: 2.2rem; font-weight: 900; color: var(--red); }
+.score-denom { font-size: .85rem; color: var(--sub); }
+.rank-label { font-size: 1.3rem; font-weight: 900; margin-bottom: 5px; }
+.rank-msg { font-size: .88rem; color: var(--sub); margin-bottom: 6px; }
+
+/* Level up/down banner */
+.lv-change {
+  border-radius: 12px; padding: 12px 16px; text-align: center;
+  font-weight: 900; font-size: 1rem; margin: 10px 0;
+}
+.lv-up { background: #e8f5e9; color: #2e7d32; border: 2px solid #2e7d32; }
+.lv-down { background: #ffebee; color: #c62828; border: 2px solid #c62828; }
+.lv-keep { background: #e3f2fd; color: #1565c0; border: 2px solid #1565c0; }
+
+.result-list { margin-top: 12px; }
+.r-item {
+  display: flex; align-items: flex-start; gap: 9px; background: #fff;
+  border-radius: 10px; padding: 10px 12px; margin-bottom: 7px;
+  font-size: .83rem; line-height: 1.6;
+}
+.r-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+.r-q { font-weight: 700; }
+.r-ans { color: var(--sub); }
+
+/* history */
+.hist-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: .82rem;
+}
+.hist-row:last-child { border: none; }
+.hist-score { font-weight: 700; }
+.hist-lv { color: var(--sub); }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="h-left">
+    <div class="logo">🚖 TOKYO MK</div>
+    <div class="subtitle">ドライバー地理知識チェック</div>
+  </div>
+  <div class="level-badge" id="headerLevel">Lv.1</div>
+</header>
+
+<!-- START -->
+<div id="startScreen" class="screen">
+  <div class="card">
+    <div class="badge">AI生成クイズ</div>
+    <h2>地理知識チェック</h2>
+    <p>AIがレベルに応じた問題を毎回生成します。正解率80%以上でレベルアップ、50%未満でレベルダウン。</p>
+    <div class="info-row">
+      <div class="chip">📝 毎回10問</div>
+      <div class="chip">🤖 AI生成</div>
+      <div class="chip">🏆 全10レベル</div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:.88rem;font-weight:700;margin-bottom:10px;">レベルを選択</div>
+    <div class="level-grid" id="levelGrid"></div>
+  </div>
+  <div class="card" id="histCard" style="display:none">
+    <div style="font-size:.88rem;font-weight:700;margin-bottom:10px;">📊 直近の記録</div>
+    <div id="histList"></div>
+  </div>
+  <button class="btn-primary" id="startBtn" onclick="startQuiz()">スタート ▶</button>
+</div>
+
+<!-- LOADING -->
+<div id="loadingScreen" class="screen hidden">
+  <div class="card">
+    <div class="spinner"></div>
+    <div class="loading-txt" id="loadingTxt">AIがLv.<span id="loadingLv"></span>の問題を生成中…<br>少々お待ちください</div>
+  </div>
+</div>
+
+<!-- QUIZ -->
+<div id="quizScreen" class="screen hidden">
+  <div class="prog-wrap">
+    <div class="prog-label">
+      <span id="qNum">問題 1 / 10</span>
+      <span id="scoreLabel">正解 0問</span>
+    </div>
+    <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+  </div>
+  <div class="card">
+    <div id="qTypeBadge" class="q-type-badge"></div>
+    <div id="qText" class="q-text"></div>
+    <div id="oxWrap" class="ox-wrap hidden">
+      <button class="ox-btn" id="oxO" onclick="answerOX('○')">○<span class="lbl">正しい</span></button>
+      <button class="ox-btn" id="oxX" onclick="answerOX('×')">×<span class="lbl">正しくない</span></button>
+    </div>
+    <div id="choicesWrap" class="choices hidden"></div>
+    <div id="explainBox" class="explain-box">
+      <div id="resLabel" class="res-label"></div>
+      <div id="explainTxt"></div>
+    </div>
+  </div>
+  <button class="btn-next" id="btnNext" onclick="nextQ()">次の問題 →</button>
+</div>
+
+<!-- RESULT -->
+<div id="resultScreen" class="screen hidden">
+  <div class="result-hero">
+    <div class="score-circle">
+      <div class="score-num" id="finalScore">0</div>
+      <div class="score-denom">/ 10問</div>
+    </div>
+    <div class="rank-label" id="rankLabel"></div>
+    <div class="rank-msg" id="rankMsg"></div>
+  </div>
+  <div id="lvChangeBanner"></div>
+  <div class="result-list" id="resultList"></div>
+  <button class="btn-primary" onclick="goStart()" style="margin-top:8px">トップに戻る</button>
+  <button class="btn-primary" onclick="startQuiz()" style="margin-top:8px;background:var(--dark)">同じレベルで再挑戦 🔄</button>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+const STORAGE_KEY = 'mk_quiz_state';
+let state = loadState();
+let questions = [], current = 0, score = 0, answers = [], selectedLevel = 1;
+
+function defaultState() {
+  return { currentLevel: 1, maxLevel: 1, history: [] };
+}
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultState(); }
+  catch { return defaultState(); }
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// ── Screens ────────────────────────────────────────────
+function show(id) {
+  ['startScreen','loadingScreen','quizScreen','resultScreen']
+    .forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id));
+}
+
+function updateHeader() {
+  document.getElementById('headerLevel').textContent = `Lv.${state.currentLevel}`;
+}
+
+// ── Start Screen ───────────────────────────────────────
+function renderStart() {
+  updateHeader();
+  selectedLevel = state.currentLevel;
+
+  // Level grid
+  const grid = document.getElementById('levelGrid');
+  grid.innerHTML = '';
+  for (let i = 1; i <= 10; i++) {
+    const unlocked = i <= state.maxLevel;
+    const isCurrent = i === state.currentLevel;
+    const btn = document.createElement('button');
+    btn.className = `lv-btn ${isCurrent ? 'current' : unlocked ? 'unlocked' : 'locked'}`;
+    btn.innerHTML = `<span class="lv-num">${i}</span><span class="lv-star">${unlocked ? '★'.repeat(Math.min(i,5)) : '🔒'}</span>`;
+    if (unlocked) btn.onclick = () => selectLevel(i);
+    grid.appendChild(btn);
+  }
+
+  // History
+  const hist = state.history.slice(-5).reverse();
+  const histCard = document.getElementById('histCard');
+  if (hist.length > 0) {
+    histCard.style.display = 'block';
+    document.getElementById('histList').innerHTML = hist.map(h =>
+      `<div class="hist-row">
+        <span class="hist-lv">Lv.${h.level} ${h.date}</span>
+        <span class="hist-score">${h.score}/10問 (${h.pct}%)</span>
+      </div>`
+    ).join('');
+  }
+  show('startScreen');
+}
+
+function selectLevel(lv) {
+  selectedLevel = lv;
+  document.querySelectorAll('.lv-btn').forEach((b, i) => {
+    const lvNum = i + 1;
+    if (lvNum <= state.maxLevel) {
+      b.className = `lv-btn ${lvNum === lv ? 'current' : 'unlocked'}`;
+    }
+  });
+}
+
+// ── Quiz Flow ──────────────────────────────────────────
+async function startQuiz() {
+  show('loadingScreen');
+  document.getElementById('loadingLv').textContent = selectedLevel;
+
+  try {
+    const res = await fetch('/api/quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: selectedLevel }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    questions = data.questions;
+    if (!Array.isArray(questions) || questions.length === 0) throw new Error('No questions');
+  } catch (e) {
+    alert(`問題の取得に失敗しました。\n${e.message}\n\nAPIキーとネットワークを確認してください。`);
+    show('startScreen');
+    return;
+  }
+
+  current = 0; score = 0; answers = [];
+  show('quizScreen');
+  renderQ();
+}
+
+function renderQ() {
+  const q = questions[current];
+  document.getElementById('qNum').textContent = `問題 ${current+1} / 10`;
+  document.getElementById('scoreLabel').textContent = `正解 ${score}問`;
+  document.getElementById('progFill').style.width = `${(current/10)*100}%`;
+
+  const badge = document.getElementById('qTypeBadge');
+  badge.textContent = q.type === 'ox' ? '〇× 問題' : '4択 問題';
+  badge.className = `q-type-badge ${q.type === 'ox' ? 'type-ox' : 'type-choice'}`;
+
+  document.getElementById('qText').textContent = q.q;
+  document.getElementById('explainBox').className = 'explain-box';
+  document.getElementById('btnNext').className = 'btn-next';
+
+  const oxWrap = document.getElementById('oxWrap');
+  const cWrap = document.getElementById('choicesWrap');
+
+  if (q.type === 'ox') {
+    oxWrap.classList.remove('hidden');
+    cWrap.classList.add('hidden');
+    document.getElementById('oxO').className = 'ox-btn';
+    document.getElementById('oxX').className = 'ox-btn';
+    document.getElementById('oxO').onclick = () => answerOX('○');
+    document.getElementById('oxX').onclick = () => answerOX('×');
+  } else {
+    oxWrap.classList.add('hidden');
+    cWrap.classList.remove('hidden');
+    const icons = ['Ａ','Ｂ','Ｃ','Ｄ'];
+    const shuffled = shuffle(q.choices || []);
+    cWrap.innerHTML = shuffled.map((c,i) =>
+      `<button class="choice-btn" onclick="answerChoice(this,'${esc(c)}')">
+        <div class="choice-icon">${icons[i]}</div>${c}
+      </button>`
+    ).join('');
+  }
+}
+
+function esc(s) { return s.replace(/'/g, "\\'"); }
+
+function shuffle(arr) {
+  let a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function showExplain(correct) {
+  const q = questions[current];
+  if (correct) {
+    score++;
+    document.getElementById('scoreLabel').textContent = `正解 ${score}問`;
+    document.getElementById('resLabel').textContent = '✅ 正解！';
+    document.getElementById('resLabel').className = 'res-label ok';
+  } else {
+    document.getElementById('resLabel').textContent = `❌ 不正解（正解：${q.a}）`;
+    document.getElementById('resLabel').className = 'res-label ng';
+  }
+  document.getElementById('explainTxt').textContent = q.explain;
+  document.getElementById('explainBox').className = 'explain-box show';
+  document.getElementById('btnNext').className = 'btn-next show';
+  answers.push({ q: q.q, correct, ans: q.a });
+}
+
+function answerOX(val) {
+  const q = questions[current];
+  const oBtn = document.getElementById('oxO');
+  const xBtn = document.getElementById('oxX');
+  oBtn.onclick = null; xBtn.onclick = null;
+  const correct = val === q.a;
+  if (val === '○') {
+    oBtn.classList.add(correct ? 'correct' : 'wrong');
+    if (!correct) xBtn.classList.add('reveal-correct');
+  } else {
+    xBtn.classList.add(correct ? 'correct' : 'wrong');
+    if (!correct) oBtn.classList.add('reveal-correct');
+  }
+  showExplain(correct);
+}
+
+function answerChoice(btn, val) {
+  const q = questions[current];
+  document.querySelectorAll('.choice-btn').forEach(b => b.onclick = null);
+  const correct = val === q.a;
+  btn.classList.add(correct ? 'correct' : 'wrong');
+  if (!correct) {
+    document.querySelectorAll('.choice-btn').forEach(b => {
+      if (b.textContent.trim().replace(/^[ＡＢＣＤ]/, '').trim() === q.a)
+        b.classList.add('reveal-correct');
+    });
+  }
+  showExplain(correct);
+}
+
+function nextQ() {
+  current++;
+  if (current >= 10) showResult();
+  else renderQ();
+}
+
+// ── Result ─────────────────────────────────────────────
+function showResult() {
+  const pct = Math.round(score / 10 * 100);
+  const date = new Date().toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
+
+  // Level change logic
+  const prevLevel = selectedLevel;
+  let newLevel = prevLevel;
+  let changeType = 'keep';
+
+  if (pct >= 80 && prevLevel < 10) { newLevel = prevLevel + 1; changeType = 'up'; }
+  else if (pct < 50 && prevLevel > 1) { newLevel = prevLevel - 1; changeType = 'down'; }
+
+  state.currentLevel = newLevel;
+  state.maxLevel = Math.max(state.maxLevel, newLevel);
+  state.history.push({ level: prevLevel, score, pct, date });
+  if (state.history.length > 20) state.history = state.history.slice(-20);
+  saveState();
+  updateHeader();
+
+  // Score circle
+  document.getElementById('finalScore').textContent = score;
+
+  // Rank
+  let rank, msg;
+  if (pct === 100) { rank = '🏆 パーフェクト！'; msg = '完璧な知識です！'; }
+  else if (pct >= 80) { rank = '🥇 合格・レベルアップ'; msg = '素晴らしい！次のレベルへ進みます。'; }
+  else if (pct >= 50) { rank = '🥈 合格'; msg = 'このレベルで引き続き練習しましょう。'; }
+  else { rank = '📚 要復習'; msg = '基本を見直してもう一度チャレンジ！'; }
+  document.getElementById('rankLabel').textContent = rank;
+  document.getElementById('rankMsg').textContent = msg;
+
+  // Level change banner
+  const banner = document.getElementById('lvChangeBanner');
+  if (changeType === 'up') {
+    banner.innerHTML = `<div class="lv-change lv-up">🎉 レベルアップ！ Lv.${prevLevel} → Lv.${newLevel}</div>`;
+  } else if (changeType === 'down') {
+    banner.innerHTML = `<div class="lv-change lv-down">📉 レベルダウン Lv.${prevLevel} → Lv.${newLevel}</div>`;
+  } else {
+    banner.innerHTML = `<div class="lv-change lv-keep">➡️ Lv.${prevLevel} キープ（${pct}%）</div>`;
+  }
+
+  // Answer list
+  document.getElementById('resultList').innerHTML =
+    '<div style="font-size:.82rem;color:#666;margin-bottom:7px;">📋 回答一覧</div>' +
+    answers.map((a,i) =>
+      `<div class="r-item">
+        <div class="r-icon">${a.correct ? '✅' : '❌'}</div>
+        <div>
+          <div class="r-q">Q${i+1}. ${a.q.length > 42 ? a.q.slice(0,42)+'…' : a.q}</div>
+          ${!a.correct ? `<div class="r-ans">正解: ${a.ans}</div>` : ''}
+        </div>
+      </div>`
+    ).join('');
+
+  show('resultScreen');
+}
+
+function goStart() { renderStart(); }
+
+// ── Init ───────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+renderStart();
+</script>
+</body>
+</html>
