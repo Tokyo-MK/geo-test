@@ -6,7 +6,3 @@ export default function handler(req, res) {
   });
 }
 ```
-
-commitしてデプロイ後に：
-```
-https://geo-test-opal.vercel.app/api/test
